@@ -1,6 +1,6 @@
 // src/pages/login/LoginPresenter.js
 
-import { subscribeUserForPush } from "../../main"; // <-- Import fungsi ini
+import { subscribeUserForPush } from "../../main"; // <-- Import fungsi
 
 export class LoginPresenter {
   constructor(model, view) {
