@@ -1,38 +1,40 @@
-importScripts(
-  "https://storage.googleapis.com/workbox-cdn/releases/6.5.0/workbox-sw.js"
-);
+// src/service-worker.js
 
-if (workbox) {
-  console.log(`Yay! Workbox is loaded 🎉`);
+/* eslint-disable no-unused-vars */
+
+// Import modul precaching dari Workbox SW, yang disediakan oleh vite-plugin-pwa
+import { precacheAndRoute } from "workbox-precaching";
+import { registerRoute } from "workbox-routing";
+import {
+  CacheFirst,
+  NetworkFirst,
+  StaleWhileRevalidate,
+} from "workbox-strategies";
+import { CacheableResponsePlugin } from "workbox-cacheable-response";
+import { ExpirationPlugin } from "workbox-expiration";
+
+// Log Workbox (opsional, untuk debugging)
+if (typeof Workbox !== "undefined") {
+  // Cek Workbox global
+  console.log(`Yay! Workbox is loaded 🎉 (via vite-plugin-pwa)`);
 } else {
   console.log(`Boo! Workbox didn't load 😬`);
 }
 
-workbox.precaching.precacheAndRoute([
-  { url: "/index.html", revision: "1" },
-  { url: "/main.js", revision: "1" },
-  { url: "/style.css", revision: "1" },
+// Workbox akan menentukan file apa yang harus di-cache selama build time
+// '__WB_MANIFEST' adalah placeholder yang akan diisi otomatis oleh vite-plugin-pwa
+precacheAndRoute(self.__WB_MANIFEST); // <--- INI PENTING! Ini akan otomatis me-precached file yang di-build
 
-  { url: "/manifest.json", revision: "1" },
-  { url: "/icons/icon-192x192.png", revision: "1" },
-  { url: "/icons/icon-512x512.png", revision: "1" },
-  { url: "/icons/icon-maskable-192x192.png", revision: "1" },
-  { url: "/icons/icon-maskable-512x512.png", revision: "1" },
-  { url: "/icons/shortcut-add-story.png", revision: "1" },
-
-  { url: "/screenshots/screenshot-desktop.png", revision: "1" },
-  { url: "/screenshots/screenshot-mobile.png", revision: "1" },
-]);
-
-workbox.routing.registerRoute(
+// Strategi Caching untuk Gambar (Image): Cache First
+registerRoute(
   ({ request }) => request.destination === "image",
-  new workbox.strategies.CacheFirst({
+  new CacheFirst({
     cacheName: "story-app-images",
     plugins: [
-      new workbox.cacheableResponse.CacheableResponsePlugin({
+      new CacheableResponsePlugin({
         statuses: [0, 200],
       }),
-      new workbox.expiration.ExpirationPlugin({
+      new ExpirationPlugin({
         maxEntries: 50,
         maxAgeSeconds: 30 * 24 * 60 * 60,
       }),
@@ -40,27 +42,31 @@ workbox.routing.registerRoute(
   })
 );
 
-workbox.routing.registerRoute(
+// Strategi Caching untuk API (API Story Dicoding): CacheFirst (untuk offline guarantee)
+registerRoute(
   ({ url }) => {
     const isApiStories =
       url.origin === "https://story-api.dicoding.dev" &&
       url.pathname.startsWith("/v1/stories");
     if (isApiStories) {
-      console.log("SW: Intercepting API stories request:", url.href);
+      console.log(
+        "SW: Intercepting API stories request (from Service Worker):",
+        url.href
+      );
     }
     return isApiStories;
   },
-  new workbox.strategies.CacheFirst({
+  new CacheFirst({
     cacheName: "story-app-api-data",
     plugins: [
-      new workbox.cacheableResponse.CacheableResponsePlugin({
+      new CacheableResponsePlugin({
         statuses: [0, 200],
       }),
-      new workbox.expiration.ExpirationPlugin({
+      new ExpirationPlugin({
         maxEntries: 20,
-        maxAgeSeconds: 60 * 60,
+        maxAgeSeconds: 60 * 60, // Data API akan disimpan selama 1 jam
       }),
-
+      // Plugin debugging
       {
         cacheWillUpdate: async ({ response }) => {
           console.log("SW: API response WILL BE CACHED.");
@@ -79,7 +85,8 @@ workbox.routing.registerRoute(
   })
 );
 
-workbox.routing.registerRoute(
+// Strategi Caching untuk Semua File JavaScript Aplikasi Lokal: StaleWhileRevalidate
+registerRoute(
   ({ url, request }) => {
     return (
       request.destination === "script" &&
@@ -87,13 +94,13 @@ workbox.routing.registerRoute(
       !url.pathname.startsWith("/node_modules/")
     );
   },
-  new workbox.strategies.StaleWhileRevalidate({
+  new StaleWhileRevalidate({
     cacheName: "story-app-local-js",
     plugins: [
-      new workbox.cacheableResponse.CacheableResponsePlugin({
+      new CacheableResponsePlugin({
         statuses: [0, 200],
       }),
-      new workbox.expiration.ExpirationPlugin({
+      new ExpirationPlugin({
         maxEntries: 100,
         maxAgeSeconds: 7 * 24 * 60 * 60,
       }),
@@ -101,17 +108,18 @@ workbox.routing.registerRoute(
   })
 );
 
-workbox.routing.registerRoute(
+// Strategi Caching untuk Google Fonts: Cache First
+registerRoute(
   ({ url }) =>
     url.origin === "https://fonts.googleapis.com" ||
     url.origin === "https://fonts.gstatic.com",
-  new workbox.strategies.CacheFirst({
+  new CacheFirst({
     cacheName: "google-fonts-cache",
     plugins: [
-      new workbox.cacheableResponse.CacheableResponsePlugin({
+      new CacheableResponsePlugin({
         statuses: [0, 200],
       }),
-      new workbox.expiration.ExpirationPlugin({
+      new ExpirationPlugin({
         maxAgeSeconds: 365 * 24 * 60 * 60,
         maxEntries: 30,
       }),
@@ -119,15 +127,16 @@ workbox.routing.registerRoute(
   })
 );
 
-workbox.routing.registerRoute(
+// Strategi Caching untuk CDN Leaflet: Cache First
+registerRoute(
   ({ url }) => url.origin === "https://unpkg.com",
-  new workbox.strategies.CacheFirst({
+  new CacheFirst({
     cacheName: "leaflet-cdn-cache",
     plugins: [
-      new workbox.cacheableResponse.CacheableResponsePlugin({
+      new CacheableResponsePlugin({
         statuses: [0, 200],
       }),
-      new workbox.expiration.ExpirationPlugin({
+      new ExpirationPlugin({
         maxEntries: 20,
         maxAgeSeconds: 30 * 24 * 60 * 60,
       }),
@@ -135,8 +144,9 @@ workbox.routing.registerRoute(
   })
 );
 
+// Event 'push' dipanggil saat Service Worker menerima pesan push dari server
 self.addEventListener("push", (event) => {
-  console.log("Push event received:", event);
+  console.log("Push event received (from Service Worker):", event);
 
   let notificationData = {
     title: "Story App Notification",
@@ -147,14 +157,17 @@ self.addEventListener("push", (event) => {
   if (event.data) {
     try {
       const receivedData = event.data.json();
-      console.log("Push data from server:", receivedData);
+      console.log("Push data from server (from Service Worker):", receivedData);
       notificationData.title = receivedData.title || notificationData.title;
       notificationData.body = receivedData.body || notificationData.body;
       notificationData.icon = receivedData.icon || notificationData.icon;
       notificationData.image = receivedData.image || undefined;
       notificationData.data = receivedData.data || undefined;
     } catch (e) {
-      console.error("Failed to parse push data as JSON:", e);
+      console.error(
+        "Failed to parse push data as JSON (from Service Worker):",
+        e
+      );
       notificationData.body = event.data.text();
     }
   }
@@ -171,8 +184,12 @@ self.addEventListener("push", (event) => {
   );
 });
 
+// Event 'notificationclick' dipanggil saat pengguna mengklik notifikasi
 self.addEventListener("notificationclick", (event) => {
-  console.log("Notification clicked:", event.notification.tag);
+  console.log(
+    "Notification clicked (from Service Worker):",
+    event.notification.tag
+  );
   event.notification.close();
 
   const clickedNotificationData = event.notification.data;
@@ -188,7 +205,6 @@ self.addEventListener("notificationclick", (event) => {
           return client.focus();
         }
       }
-
       if (self.clients.openWindow) {
         return self.clients.openWindow(targetUrl);
       }
@@ -197,10 +213,11 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
+// Event 'message' untuk menerima pesan dari halaman utama
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
 });
 
-console.log("Service Worker with Workbox script loaded.");
+console.log("Service Worker script loaded with VitePWA integration.");
