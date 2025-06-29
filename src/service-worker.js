@@ -2,7 +2,8 @@
 
 /* eslint-disable no-unused-vars */
 
-// Import modul precaching dari Workbox SW, yang disediakan oleh vite-plugin-pwa
+// Workbox diimport oleh vite-plugin-pwa secara internal, tidak perlu importScripts
+// Cukup import modul yang dibutuhkan dari workbox-sw
 import { precacheAndRoute } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
 import {
@@ -13,17 +14,14 @@ import {
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
 import { ExpirationPlugin } from "workbox-expiration";
 
-// Log Workbox (opsional, untuk debugging)
-if (typeof Workbox !== "undefined") {
-  // Cek Workbox global
-  console.log(`Yay! Workbox is loaded 🎉 (via vite-plugin-pwa)`);
-} else {
-  console.log(`Boo! Workbox didn't load 😬`);
-}
+// Variabel Workbox global seharusnya sudah tersedia berkat vite-plugin-pwa
+// Kita tidak perlu lagi if (workbox) check di sini, cukup gunakan modulnya
 
-// Workbox akan menentukan file apa yang harus di-cache selama build time
+console.log("Service Worker script loaded with VitePWA integration.");
+
+// Workbox Precaching untuk Application Shell.
 // '__WB_MANIFEST' adalah placeholder yang akan diisi otomatis oleh vite-plugin-pwa
-precacheAndRoute(self.__WB_MANIFEST); // <--- INI PENTING! Ini akan otomatis me-precached file yang di-build
+precacheAndRoute(self.__WB_MANIFEST);
 
 // Strategi Caching untuk Gambar (Image): Cache First
 registerRoute(
@@ -42,7 +40,7 @@ registerRoute(
   })
 );
 
-// Strategi Caching untuk API (API Story Dicoding): CacheFirst (untuk offline guarantee)
+// Strategi Caching untuk API (API Story Dicoding): CacheFirst
 registerRoute(
   ({ url }) => {
     const isApiStories =
@@ -64,9 +62,8 @@ registerRoute(
       }),
       new ExpirationPlugin({
         maxEntries: 20,
-        maxAgeSeconds: 60 * 60, // Data API akan disimpan selama 1 jam
+        maxAgeSeconds: 60 * 60,
       }),
-      // Plugin debugging
       {
         cacheWillUpdate: async ({ response }) => {
           console.log("SW: API response WILL BE CACHED.");
@@ -219,5 +216,3 @@ self.addEventListener("message", (event) => {
     self.skipWaiting();
   }
 });
-
-console.log("Service Worker script loaded with VitePWA integration.");
