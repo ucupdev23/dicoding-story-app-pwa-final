@@ -1,2 +1,17 @@
 APP_URL=https://gorgeous-ganache-520de5.netlify.app/
 MAP_SERVICE_API_KEY=<api_key>
+
+Push Notification Issue:
+------------------------
+Client-side push subscription (PushManager.subscribe()) is successful and generates an endpoint:
+(e.g., PushSubscription {endpoint: 'https://fcm.googleapis.com/fcm/send/...'})
+
+However, the subsequent POST request from the client (https://gorgeous-ganache-520de5.netlify.app)
+to register this subscription with the Story API backend (https://story-api.dicoding.dev/v1/subscriptions)
+is BLOCKED by CORS policy.
+
+Error in browser console:
+"Access to fetch at 'https://story-api.dicoding.dev/v1/subscriptions' from origin 'https://gorgeous-ganache-520de5.netlify.app' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+
+This indicates a server-side configuration issue where the Story API is not sending the necessary 'Access-Control-Allow-Origin' header in its response to the browser's preflight (OPTIONS) request for cross-origin POSTs from this deployed domain.
+The client-side implementation logic for push notifications (subscription, sending to API, SW handling) is in place, but the API interaction is hindered by this CORS policy.
