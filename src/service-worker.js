@@ -3,6 +3,9 @@
 /* eslint-disable no-unused-vars */
 
 // Workbox diimport oleh vite-plugin-pwa secara internal, tidak perlu importScripts
+importScripts(
+  "https://storage.googleapis.com/workbox-cdn/releases/6.5.0/workbox-sw.js"
+);
 // Cukup import modul yang dibutuhkan dari workbox-sw
 import { precacheAndRoute } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
