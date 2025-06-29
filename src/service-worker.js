@@ -141,6 +141,49 @@ registerRoute(
   })
 );
 
+// >>>>>> TAMBAHKAN KODE setCatchHandler INI <<<<<<
+// setCatchHandler adalah fallback handler terakhir jika strategi Workbox gagal merespons
+workbox.routing.setCatchHandler(async ({ event }) => {
+  console.log("SW: setCatchHandler triggered for:", event.request.url);
+
+  // Jika permintaan adalah navigasi (misalnya, pengguna mencoba membuka URL yang tidak di-cache)
+  if (event.request.mode === "navigate") {
+    // Coba kembalikan index.html dari cache precache
+    const cachedResponse = await caches.match("/index.html");
+    if (cachedResponse) {
+      console.log("SW: Serving index.html from cache as fallback.");
+      return cachedResponse;
+    }
+  }
+
+  // Jika permintaan untuk gambar dan gambar gagal, bisa mengembalikan fallback image
+  if (event.request.destination === "image") {
+    // return caches.match('/path/to/offline-image.png'); // Contoh: jika Anda punya gambar offline default
+    console.log("SW: Image request failed, no fallback image provided.");
+  }
+
+  // Jika ini adalah permintaan API yang gagal, coba ambil dari cache API
+  if (
+    event.request.url.origin === "https://story-api.dicoding.dev" &&
+    event.request.url.pathname.startsWith("/v1/stories")
+  ) {
+    const cachedResponse = await caches.match(event.request.url, {
+      cacheName: "story-app-api-data",
+    });
+    if (cachedResponse) {
+      console.log(
+        "SW: Serving API response from API cache as fallback in catchHandler!"
+      );
+      return cachedResponse;
+    }
+  }
+
+  // Jika tidak ada fallback yang bisa diberikan, kembalikan sinyal 'no-response'
+  console.log("SW: setCatchHandler could not provide a response.");
+  return Response.error(); // Mengembalikan respons error jaringan standar
+});
+// >>>>>> AKHIR KODE setCatchHandler INI <<<<<<
+
 // Event 'push' dipanggil saat Service Worker menerima pesan push dari server
 self.addEventListener("push", (event) => {
   console.log("Push event received (from Service Worker):", event);
