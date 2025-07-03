@@ -25,7 +25,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "src/index.html"), // Entry point utama HTML Anda
-        sw: resolve(__dirname, "src/service-worker.js"), // Service Worker sebagai entry point terpisah
+        "service-worker": resolve(__dirname, "src/service-worker.js"), // <--- UBAH NAMA INPUT INI
       },
       output: {
         // entryFileNames: '[name].js', // Ini akan menghilangkan hashing nama file.
