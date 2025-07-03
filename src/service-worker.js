@@ -2,6 +2,15 @@
 
 /* eslint-disable no-unused-vars */
 
+// Memuat seluruh pustaka Workbox dari CDN.
+// Ini diperlukan karena kita tidak menggunakan vite-plugin-pwa untuk inject Workbox.
+importScripts(
+  "https://storage.googleapis.com/workbox-cdn/releases/6.5.0/workbox-sw.js"
+);
+
+// Log untuk memastikan Service Worker dimuat.
+console.log("Service Worker script loaded with manual Workbox integration.");
+
 // Konstanta Cache dan URL
 const CACHE_NAME = "stories-app-cache"; // Nama cache aplikasi Anda
 const CACHE_VERSION = "v1.0.0"; // Versi cache. Ubah ini jika ada perubahan pada aset yang di-cache
@@ -13,9 +22,9 @@ const OFFLINE_PAGE_URL = `${BASE_URL}offline.html`; // <--- Kita perlu membuat f
 const urlsToCache = [
   BASE_URL, // Cache root URL
   `${BASE_URL}index.html`,
-  `${BASE_URL}main.js`, // Nama file JS utama tanpa hash
+  `${BASE_URL}main.js`, // Nama file JS utama tanpa hash (karena entryFileNames di vite.config.js)
   `${BASE_URL}style.css`, // Nama file CSS utama tanpa hash
-  `${BASE_URL}manifest.json`, // Manifest PWA
+  `${BASE_URL}manifest.json`, // Manifest PWA (pastikan nama file ini yang benar di src/public)
   `${BASE_URL}offline.html`, // Halaman offline fallback
 
   // Icons (pastikan path ini sesuai dengan folder src/public/icons Anda)
@@ -50,13 +59,10 @@ const urlsToCache = [
 
   // CDN dari Google Fonts (yang Anda gunakan di index.html)
   "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap",
-  "https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JPZGzf5am.woff2", // Contoh WOFF2 untuk Poppins
-  // ... tambahkan URL font spesifik lainnya jika ada
-
-  // CDN dari Font Awesome
+  "https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JPZGzf5am.woff2",
   "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css",
-  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/webfonts/fa-solid-900.woff2", // Contoh font-awesome font
-  // ... tambahkan URL font-awesome font spesifik lainnya
+  // Tambahkan URL font-awesome font spesifik lainnya jika ada yang digunakan
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/webfonts/fa-solid-900.woff2",
 
   // CDN dari Leaflet
   "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css",
@@ -137,7 +143,7 @@ const handleNetworkRequest = async (request) => {
   }
 };
 
-// Fetch event - Serve from cache, falling back to network or specific handlers
+// Fetch event - Serve from cache, falling back to network
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
 
@@ -156,8 +162,10 @@ self.addEventListener("fetch", (event) => {
     requestUrl.origin !== "https://story-api.dicoding.dev" &&
     requestUrl.origin !== "https://fonts.googleapis.com" &&
     requestUrl.origin !== "https://fonts.gstatic.com" &&
-    requestUrl.origin !== "https://unpkg.com"
+    requestUrl.origin !== "https://unpkg.com" &&
+    requestUrl.origin !== "https://cdnjs.cloudflare.com"
   ) {
+    // Tambahkan Font Awesome CDN
     return;
   }
 
@@ -167,6 +175,7 @@ self.addEventListener("fetch", (event) => {
     "https://fonts.googleapis.com",
     "https://fonts.gstatic.com",
     "https://unpkg.com",
+    "https://cdnjs.cloudflare.com", // Tambahkan Font Awesome CDN
   ];
   if (
     cacheOnlyUrls.some((origin) => requestUrl.origin.startsWith(origin)) &&
@@ -218,8 +227,8 @@ self.addEventListener("fetch", (event) => {
         .catch(async () => {
           // Jika network gagal
           const cachedResponse = await caches.match(event.request, {
-            cacheName: CACHE_NAME_VERSIONED,
-          });
+            cacheName: "story-app-api-data",
+          }); // Gunakan cache khusus API
           if (cachedResponse) {
             console.log(
               "SW: Serving API response from API cache as fallback in fetch handler!"
@@ -231,7 +240,6 @@ self.addEventListener("fetch", (event) => {
             "SW: API request failed and no cache found for:",
             event.request.url
           );
-          // Mengembalikan response khusus untuk aplikasi agar bisa menampilkan pesan error yang tepat
           return new Response(
             JSON.stringify({
               error: true,
@@ -257,7 +265,7 @@ self.addEventListener("fetch", (event) => {
       return fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse.status === 200) {
-            const cache = caches.open(CACHE_NAME_VERSIONED);
+            const cache = caches.open("story-images"); // Cache terpisah untuk gambar
             cache.then((c) => c.put(event.request, networkResponse.clone()));
           }
           return networkResponse;
@@ -327,7 +335,7 @@ self.addEventListener("notificationclick", (event) => {
         if (clients.openWindow) {
           return clients.openWindow(targetUrl);
         }
-        return null;
+        return clients.openWindow(targetUrl); // Mengganti dengan targetUrl
       })
   );
 });
