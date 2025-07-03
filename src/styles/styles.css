@@ -93,12 +93,9 @@ header {
   text-decoration: underline;
 }
 
-/* MAIN */
 .main-content {
   padding-block: 20px;
 }
-
-/* Write your styles more here */
 
 @media screen and (width > 1000px) {
   .navigation-drawer {

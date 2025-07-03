@@ -1,6 +1,4 @@
-// src/pages/login/LoginPresenter.js
-
-import { subscribeUserForPush } from "../../main"; // <-- Import fungsi
+import { subscribeUserForPush } from "../../main";
 
 export class LoginPresenter {
   constructor(model, view) {
@@ -14,8 +12,6 @@ export class LoginPresenter {
       const user = await this.model.login(email, password);
       this.view.renderLoginSuccess(user);
 
-      // Panggil fungsi subscribeUserForPush setelah login berhasil
-      // Pastikan pengguna online saat ini untuk subscribe
       if (navigator.onLine) {
         await subscribeUserForPush();
       } else {

@@ -2,263 +2,332 @@
 
 /* eslint-disable no-unused-vars */
 
-// Workbox diimport oleh vite-plugin-pwa secara internal, tidak perlu importScripts
-importScripts(
-  "https://storage.googleapis.com/workbox-cdn/releases/6.5.0/workbox-sw.js"
-);
-// Cukup import modul yang dibutuhkan dari workbox-sw
-import { precacheAndRoute } from "workbox-precaching";
-import { registerRoute } from "workbox-routing";
-import {
-  CacheFirst,
-  NetworkFirst,
-  StaleWhileRevalidate,
-} from "workbox-strategies";
-import { CacheableResponsePlugin } from "workbox-cacheable-response";
-import { ExpirationPlugin } from "workbox-expiration";
+// Konstanta Cache dan URL
+const CACHE_NAME = "stories-app-cache"; // Nama cache aplikasi Anda
+const CACHE_VERSION = "v1.0.0"; // Versi cache. Ubah ini jika ada perubahan pada aset yang di-cache
+const CACHE_NAME_VERSIONED = `${CACHE_NAME}-${CACHE_VERSION}`;
+const BASE_URL = "/"; // <--- PASTIKAN INI '/' UNTUK DEPLOYMENT ROOT ANDA
+const OFFLINE_PAGE_URL = `${BASE_URL}offline.html`; // <--- Kita perlu membuat file offline.html
 
-// Variabel Workbox global seharusnya sudah tersedia berkat vite-plugin-pwa
-// Kita tidak perlu lagi if (workbox) check di sini, cukup gunakan modulnya
+// Daftar URL yang akan di-cache saat instalasi Service Worker (Application Shell)
+const urlsToCache = [
+  BASE_URL, // Cache root URL
+  `${BASE_URL}index.html`,
+  `${BASE_URL}main.js`, // Nama file JS utama tanpa hash
+  `${BASE_URL}style.css`, // Nama file CSS utama tanpa hash
+  `${BASE_URL}manifest.json`, // Manifest PWA
+  `${BASE_URL}offline.html`, // Halaman offline fallback
 
-console.log("Service Worker script loaded with VitePWA integration.");
+  // Icons (pastikan path ini sesuai dengan folder src/public/icons Anda)
+  `${BASE_URL}icons/icon-192x192.png`,
+  `${BASE_URL}icons/icon-512x512.png`,
+  `${BASE_URL}icons/icon-maskable-192x192.png`,
+  `${BASE_URL}icons/icon-maskable-512x512.png`,
+  `${BASE_URL}icons/shortcut-add-story.png`,
 
-// Workbox Precaching untuk Application Shell.
-// '__WB_MANIFEST' adalah placeholder yang akan diisi otomatis oleh vite-plugin-pwa
-precacheAndRoute(self.__WB_MANIFEST);
+  // Screenshots (pastikan path ini sesuai dengan folder src/public/screenshots Anda)
+  `${BASE_URL}screenshots/screenshot-desktop.png`,
+  `${BASE_URL}screenshots/screenshot-mobile.png`,
 
-// Strategi Caching untuk Gambar (Image): Cache First
-registerRoute(
-  ({ request }) => request.destination === "image",
-  new CacheFirst({
-    cacheName: "story-app-images",
-    plugins: [
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-      new ExpirationPlugin({
-        maxEntries: 50,
-        maxAgeSeconds: 30 * 24 * 60 * 60,
-      }),
-    ],
-  })
-);
+  // File JS aplikasi lainnya (sesuai struktur Anda dan nama file tanpa hash dari rollupOptions)
+  // Ini harus sesuai dengan semua file .js di folder src/pages, src/routes, src/api, src/utils Anda
+  `${BASE_URL}pages/stories/StoryModel.js`,
+  `${BASE_URL}pages/stories/StoryView.js`,
+  `${BASE_URL}pages/stories/StoryPresenter.js`,
+  `${BASE_URL}pages/add-story/AddStoryModel.js`,
+  `${BASE_URL}pages/add-story/AddStoryView.js`,
+  `${BASE_URL}pages/add-story/AddStoryPresenter.js`,
+  `${BASE_URL}pages/login/LoginModel.js`,
+  `${BASE_URL}pages/login/LoginView.js`,
+  `${BASE_URL}pages/login/LoginPresenter.js`,
+  `${BASE_URL}pages/favorites/FavoriteModel.js`,
+  `${BASE_URL}pages/favorites/FavoriteView.js`,
+  `${BASE_URL}pages/favorites/FavoritePresenter.js`,
+  `${BASE_URL}routes/AppRouter.js`,
+  `${BASE_URL}api/StoryApiService.js`,
+  `${BASE_URL}utils/MapHelper.js`,
+  `${BASE_URL}utils/IndexedDBHelper.js`,
 
-// Strategi Caching untuk API (API Story Dicoding): CacheFirst
-registerRoute(
-  ({ url }) => {
-    const isApiStories =
-      url.origin === "https://story-api.dicoding.dev" &&
-      url.pathname.startsWith("/v1/stories");
-    if (isApiStories) {
-      console.log(
-        "SW: Intercepting API stories request (from Service Worker):",
-        url.href
-      );
-    }
-    return isApiStories;
-  },
-  new CacheFirst({
-    cacheName: "story-app-api-data",
-    plugins: [
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-      new ExpirationPlugin({
-        maxEntries: 20,
-        maxAgeSeconds: 60 * 60,
-      }),
-      {
-        cacheWillUpdate: async ({ response }) => {
-          console.log("SW: API response WILL BE CACHED.");
-          return response;
-        },
-        cachedResponseWillBeUsed: async ({ response }) => {
-          console.log("SW: Serving API response FROM CACHE!");
-          return response;
-        },
-        handlerDidError: async ({ request, error }) => {
-          console.error("SW: API handler ERROR:", error);
-          return null;
-        },
-      },
-    ],
-  })
-);
+  // CDN dari Google Fonts (yang Anda gunakan di index.html)
+  "https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap",
+  "https://fonts.gstatic.com/s/poppins/v20/pxiByp8kv8JPZGzf5am.woff2", // Contoh WOFF2 untuk Poppins
+  // ... tambahkan URL font spesifik lainnya jika ada
 
-// Strategi Caching untuk Semua File JavaScript Aplikasi Lokal: StaleWhileRevalidate
-registerRoute(
-  ({ url, request }) => {
-    return (
-      request.destination === "script" &&
-      url.origin === self.location.origin &&
-      !url.pathname.startsWith("/node_modules/")
-    );
-  },
-  new StaleWhileRevalidate({
-    cacheName: "story-app-local-js",
-    plugins: [
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-      new ExpirationPlugin({
-        maxEntries: 100,
-        maxAgeSeconds: 7 * 24 * 60 * 60,
-      }),
-    ],
-  })
-);
+  // CDN dari Font Awesome
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css",
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/webfonts/fa-solid-900.woff2", // Contoh font-awesome font
+  // ... tambahkan URL font-awesome font spesifik lainnya
 
-// Strategi Caching untuk Google Fonts: Cache First
-registerRoute(
-  ({ url }) =>
-    url.origin === "https://fonts.googleapis.com" ||
-    url.origin === "https://fonts.gstatic.com",
-  new CacheFirst({
-    cacheName: "google-fonts-cache",
-    plugins: [
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-      new ExpirationPlugin({
-        maxAgeSeconds: 365 * 24 * 60 * 60,
-        maxEntries: 30,
-      }),
-    ],
-  })
-);
+  // CDN dari Leaflet
+  "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css",
+  "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+  "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+];
 
-// Strategi Caching untuk CDN Leaflet: Cache First
-registerRoute(
-  ({ url }) => url.origin === "https://unpkg.com",
-  new CacheFirst({
-    cacheName: "leaflet-cdn-cache",
-    plugins: [
-      new CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-      new ExpirationPlugin({
-        maxEntries: 20,
-        maxAgeSeconds: 30 * 24 * 60 * 60,
-      }),
-    ],
-  })
-);
+// Event 'install' - Cache the application shell
+self.addEventListener("install", (event) => {
+  console.log(`[Service Worker] Installing version ${CACHE_VERSION}...`);
+  self.skipWaiting(); // Penting: aktifkan SW baru segera
 
-// >>>>>> TAMBAHKAN KODE setCatchHandler INI <<<<<<
-// setCatchHandler adalah fallback handler terakhir jika strategi Workbox gagal merespons
-workbox.routing.setCatchHandler(async ({ event }) => {
-  console.log("SW: setCatchHandler triggered for:", event.request.url);
-
-  // Jika permintaan adalah navigasi (misalnya, pengguna mencoba membuka URL yang tidak di-cache)
-  if (event.request.mode === "navigate") {
-    // Coba kembalikan index.html dari cache precache
-    const cachedResponse = await caches.match("/index.html");
-    if (cachedResponse) {
-      console.log("SW: Serving index.html from cache as fallback.");
-      return cachedResponse;
-    }
-  }
-
-  // Jika permintaan untuk gambar dan gambar gagal, bisa mengembalikan fallback image
-  if (event.request.destination === "image") {
-    // return caches.match('/path/to/offline-image.png'); // Contoh: jika Anda punya gambar offline default
-    console.log("SW: Image request failed, no fallback image provided.");
-  }
-
-  // Jika ini adalah permintaan API yang gagal, coba ambil dari cache API
-  if (
-    event.request.url.origin === "https://story-api.dicoding.dev" &&
-    event.request.url.pathname.startsWith("/v1/stories")
-  ) {
-    const cachedResponse = await caches.match(event.request.url, {
-      cacheName: "story-app-api-data",
-    });
-    if (cachedResponse) {
-      console.log(
-        "SW: Serving API response from API cache as fallback in catchHandler!"
-      );
-      return cachedResponse;
-    }
-  }
-
-  // Jika tidak ada fallback yang bisa diberikan, kembalikan sinyal 'no-response'
-  console.log("SW: setCatchHandler could not provide a response.");
-  return Response.error(); // Mengembalikan respons error jaringan standar
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME_VERSIONED)
+      .then((cache) => {
+        console.log("[Service Worker] Caching app shell and static assets");
+        return cache
+          .addAll(urlsToCache)
+          .then(() => {
+            console.log("[Service Worker] All assets have been cached");
+          })
+          .catch((error) => {
+            console.error(
+              "[Service Worker] Failed to cache some assets:",
+              error
+            );
+            // Jangan gagal instalasi jika beberapa aset tidak bisa di-cache
+          });
+      })
+      .catch((error) => {
+        console.error(
+          "[Service Worker] Failed to open cache during install:",
+          error
+        );
+      })
+  );
 });
-// >>>>>> AKHIR KODE setCatchHandler INI <<<<<<
 
-// Event 'push' dipanggil saat Service Worker menerima pesan push dari server
+// Event 'activate' - Clean up old caches and take control
+self.addEventListener("activate", (event) => {
+  console.log("[Service Worker] Activating...");
+
+  // Remove old caches
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (
+            cacheName.startsWith(CACHE_NAME) &&
+            cacheName !== CACHE_NAME_VERSIONED
+          ) {
+            console.log("[Service Worker] Removing old cache:", cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim(); // Ambil kendali semua klien segera
+});
+
+// Helper function untuk handle network requests dengan cache fallback
+const handleNetworkRequest = async (request) => {
+  try {
+    const networkResponse = await fetch(request);
+
+    // If we got a valid response, cache it (for GET requests only)
+    if (request.method === "GET" && networkResponse.status === 200) {
+      const cache = await caches.open(CACHE_NAME_VERSIONED);
+      await cache.put(request, networkResponse.clone()); // Simpan respons ke cache
+    }
+    return networkResponse;
+  } catch (error) {
+    console.error("Network request failed, trying cache", error);
+    throw error; // Lempar kembali agar bisa ditangkap oleh caller
+  }
+};
+
+// Fetch event - Serve from cache, falling back to network or specific handlers
+self.addEventListener("fetch", (event) => {
+  const requestUrl = new URL(event.request.url);
+
+  // Abaikan non-GET requests dan non-http(s) requests
+  if (
+    event.request.method !== "GET" ||
+    !requestUrl.protocol.startsWith("http")
+  ) {
+    return;
+  }
+
+  // Abaikan permintaan lintas-asal (cross-origin) yang tidak spesifik
+  // kecuali untuk API atau CDN yang kita handle secara khusus
+  if (
+    requestUrl.origin !== self.location.origin &&
+    requestUrl.origin !== "https://story-api.dicoding.dev" &&
+    requestUrl.origin !== "https://fonts.googleapis.com" &&
+    requestUrl.origin !== "https://fonts.gstatic.com" &&
+    requestUrl.origin !== "https://unpkg.com"
+  ) {
+    return;
+  }
+
+  // Strategi Cache-First untuk aset statis dan CDN
+  const cacheOnlyUrls = [
+    self.location.origin, // Root dan semua aset lokal
+    "https://fonts.googleapis.com",
+    "https://fonts.gstatic.com",
+    "https://unpkg.com",
+  ];
+  if (
+    cacheOnlyUrls.some((origin) => requestUrl.origin.startsWith(origin)) &&
+    requestUrl.pathname !== "/v1/stories"
+  ) {
+    event.respondWith(
+      caches
+        .match(event.request, { cacheName: CACHE_NAME_VERSIONED })
+        .then((cachedResponse) => {
+          if (cachedResponse) {
+            console.log(
+              `[Service Worker] Serving from cache: ${event.request.url}`
+            );
+            return cachedResponse;
+          }
+          // Jika tidak ada di cache, coba network dan cache
+          return fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse.status === 200) {
+                const cache = caches.open(CACHE_NAME_VERSIONED);
+                cache.then((c) =>
+                  c.put(event.request, networkResponse.clone())
+                );
+              }
+              return networkResponse;
+            })
+            .catch(() => {
+              // Jika network juga gagal dan ini request navigation, layani offline page
+              if (event.request.mode === "navigate") {
+                return caches.match(OFFLINE_PAGE_URL);
+              }
+              return new Response(
+                "You are offline and this resource is not available in the cache.",
+                { status: 408, headers: { "Content-Type": "text/plain" } }
+              );
+            });
+        })
+    );
+    return;
+  }
+
+  // Strategi Network-First dengan Cache Fallback untuk API Stories
+  if (
+    requestUrl.origin === "https://story-api.dicoding.dev" &&
+    requestUrl.pathname.startsWith("/v1/stories")
+  ) {
+    event.respondWith(
+      handleNetworkRequest(event.request) // Coba network
+        .catch(async () => {
+          // Jika network gagal
+          const cachedResponse = await caches.match(event.request, {
+            cacheName: CACHE_NAME_VERSIONED,
+          });
+          if (cachedResponse) {
+            console.log(
+              "SW: Serving API response from API cache as fallback in fetch handler!"
+            );
+            return cachedResponse;
+          }
+          // Jika tidak ada di cache, dan ini request API, kembalikan response error
+          console.error(
+            "SW: API request failed and no cache found for:",
+            event.request.url
+          );
+          // Mengembalikan response khusus untuk aplikasi agar bisa menampilkan pesan error yang tepat
+          return new Response(
+            JSON.stringify({
+              error: true,
+              message: "Offline: Data tidak tersedia di cache.",
+            }),
+            {
+              status: 503, // Service Unavailable
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        })
+    );
+    return;
+  }
+
+  // Untuk permintaan lainnya (misalnya, gambar story dari API yang tidak ditangkap oleh Image Strategy awal)
+  // Gunakan strategi Cache-First
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse.status === 200) {
+            const cache = caches.open(CACHE_NAME_VERSIONED);
+            cache.then((c) => c.put(event.request, networkResponse.clone()));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          if (event.request.destination === "image") {
+            // Placeholder jika gambar gagal dimuat
+            return new Response(
+              '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Image not available</title><path fill="currentColor" d="M21 5v6.59l-3-3.01-4 4.01-4-4-4 4-3-3.01L3 5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2zm-3 6.42l3 3.01V19c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-6.58l3 2.99 4-4 4-4 4-4z"/></svg>',
+              { headers: { "Content-Type": "image/svg+xml" } }
+            );
+          }
+          return new Response("Offline: Resource not available", {
+            status: 408,
+            headers: { "Content-Type": "text/plain" },
+          });
+        });
+    })
+  );
+});
+
+// Helper function untuk mengirim pesan ke semua klien
+const notifyClients = async (message) => {
+  const clients = await self.clients.matchAll({ type: "window" });
+  clients.forEach((client) => {
+    client.postMessage(message);
+  });
+};
+
+// Listen for push events (for Push Notifications)
 self.addEventListener("push", (event) => {
   console.log("Push event received (from Service Worker):", event);
-
-  let notificationData = {
-    title: "Story App Notification",
-    body: "Anda memiliki cerita baru!",
-    icon: "/icons/icon-192x192.png",
+  const title = "Stories App";
+  const options = {
+    body: event.data?.text() || "You have new updates!",
+    icon: `${BASE_URL}icons/icon-192x192.png`, // Perhatikan BASE_URL
+    badge: `${BASE_URL}icons/icon-96x96.png`, // Perhatikan BASE_URL
+    vibrate: [100, 50, 100],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1,
+      url: `${BASE_URL}#/stories`, // URL yang akan dibuka saat notifikasi diklik
+    },
   };
 
-  if (event.data) {
-    try {
-      const receivedData = event.data.json();
-      console.log("Push data from server (from Service Worker):", receivedData);
-      notificationData.title = receivedData.title || notificationData.title;
-      notificationData.body = receivedData.body || notificationData.body;
-      notificationData.icon = receivedData.icon || notificationData.icon;
-      notificationData.image = receivedData.image || undefined;
-      notificationData.data = receivedData.data || undefined;
-    } catch (e) {
-      console.error(
-        "Failed to parse push data as JSON (from Service Worker):",
-        e
-      );
-      notificationData.body = event.data.text();
-    }
-  }
-
-  event.waitUntil(
-    self.registration.showNotification(notificationData.title, {
-      body: notificationData.body,
-      icon: notificationData.icon,
-      image: notificationData.image,
-      data: notificationData.data,
-      vibrate: [200, 100, 200],
-      badge: "/icons/icon-72x72.png",
-    })
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Event 'notificationclick' dipanggil saat pengguna mengklik notifikasi
+// Handle notification clicks
 self.addEventListener("notificationclick", (event) => {
-  console.log(
-    "Notification clicked (from Service Worker):",
-    event.notification.tag
-  );
+  console.log("Notification click received (from Service Worker).", event);
   event.notification.close();
 
-  const clickedNotificationData = event.notification.data;
-  const targetUrl =
-    clickedNotificationData && clickedNotificationData.url
-      ? clickedNotificationData.url
-      : "/";
+  const targetUrl = event.notification.data?.url || `${BASE_URL}#/stories`; // Gunakan URL dari data notifikasi atau default
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window" }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url === targetUrl && "focus" in client) {
-          return client.focus();
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        // Jika window sudah ada, fokus ke sana
+        for (const client of clientList) {
+          if (client.url === targetUrl && "focus" in client) {
+            return client.focus();
+          }
         }
-      }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
-      }
-      return null;
-    })
+        // Jika tidak, buka window baru
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+        return null;
+      })
   );
-});
-
-// Event 'message' untuk menerima pesan dari halaman utama
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
 });

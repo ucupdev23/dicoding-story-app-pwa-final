@@ -22,11 +22,10 @@ function urlBase64ToUint8Array(base64String) {
 
 // GANTI DENGAN VAPID PUBLIC KEY ASLI DARI DOKUMENTASI API DICODING
 export const VAPID_PUBLIC_KEY =
-  "BCCs2eonMI-6H2ctvFaWg-UYdDv387Vno_bzUzALpB442r2lCnsHmtrx8biyPi_E-1fSGABK_Qs_GlvPoJJqxbk"; // <-- GANTI INI! Tambahkan export
+  "BCCs2eonMI-6H2ctvFaWg-UYdDv387Vno_bzUzALpB442r2lCnsHmtrx8biyPi_E-1fSGABK_Qs_GlvPoJJqxbk"; // <-- GANTI INI!
 
 // Fungsi untuk berlangganan push notification
 export async function subscribeUserForPush() {
-  // <-- Tambahkan export agar bisa diakses dari LoginPresenter
   const storyApiService = new StoryApiService();
 
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
@@ -35,22 +34,25 @@ export async function subscribeUserForPush() {
     return;
   }
 
+  // Pastikan Service Worker sudah ready
   const serviceWorkerRegistration = await navigator.serviceWorker.ready;
   console.log("Service Worker is ready:", serviceWorkerRegistration.scope);
 
+  // Cek apakah sudah ada subscription
   const existingSubscription =
     await serviceWorkerRegistration.pushManager.getSubscription();
   if (existingSubscription) {
     console.log("Existing push subscription found:", existingSubscription);
     try {
-      // Selalu kirim ulang subscription yang ada untuk memastikan backend tahu (penting untuk robustnes)
+      // Penting: Selalu kirim ulang subscription yang ada untuk memastikan backend tahu (untuk robustnes)
       await storyApiService.sendUserSubscription(existingSubscription.toJSON());
       console.log("Existing subscription re-sent to backend.");
+      alert("Anda akan menerima notifikasi cerita baru!"); // Notifikasi bahwa subscription berhasil
       return existingSubscription;
     } catch (error) {
       console.error("Failed to re-send existing subscription:", error);
-      // Jika gagal kirim ulang, mungkin subscription di backend sudah expired. Coba subscribe ulang.
-      await existingSubscription.unsubscribe(); // Unsubscribe yang lama
+      // Jika gagal kirim ulang, mungkin subscription di backend sudah expired. Coba unsubscribe yang lama dan subscribe ulang.
+      await existingSubscription.unsubscribe();
       return subscribeUserForPush(); // Coba proses subscription dari awal
     }
   }
@@ -75,8 +77,8 @@ export async function subscribeUserForPush() {
     });
 
     console.log("Push subscription successful:", subscription);
-    await storyApiService.sendUserSubscription(subscription.toJSON());
-    alert("Anda akan menerima notifikasi cerita baru!");
+    await storyApiService.sendUserSubscription(subscription.toJSON()); // Kirim subscription ke backend
+    alert("Anda akan menerima notifikasi cerita baru!"); // Notifikasi bahwa subscription berhasil
     return subscription;
   } catch (error) {
     console.error(
@@ -91,15 +93,23 @@ export async function subscribeUserForPush() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Hapus panggilan subscribeUserForPush() di sini
-  // if ('serviceWorker' in navigator) {
-  //   navigator.serviceWorker.ready.then(async (registration) => {
-  //     console.log('Service Worker is ready, attempting to subscribe for push notifications...');
-  //     await subscribeUserForPush();
-  //   }).catch(error => {
-  //     console.error('Service Worker not ready or failed to subscribe:', error);
-  //   });
-  // }
+  // Pendaftaran Service Worker secara manual
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      // Panggil saat seluruh halaman dan aset dimuat
+      navigator.serviceWorker
+        .register("/service-worker.js") // Path Service Worker relatif terhadap root
+        .then((registration) => {
+          console.log(
+            "Service Worker registered with scope:",
+            registration.scope
+          );
+        })
+        .catch((error) => {
+          console.error("Service Worker registration failed:", error);
+        });
+    });
+  }
 
   const router = new AppRouter();
   router.handleLocation();
