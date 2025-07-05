@@ -1,40 +1,27 @@
-// vite.config.js
 import { defineConfig } from "vite";
 import { resolve } from "path";
-import { fileURLToPath } from "url"; // Diperlukan untuk __dirname di ES module
+import { fileURLToPath } from "url";
 
-// Dapatkan nama direktori di ES module (untuk __dirname)
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
-  // Root proyek kita adalah folder 'src'
   root: resolve(__dirname, "src"),
 
-  // Base URL untuk deployment. Karena di Netlify kita deploy ke root, ini adalah '/'
-  // Jika Anda deploy ke sub-folder (misal GitHub Pages), ini perlu diganti
-  base: "/", // <--- PASTIKAN INI HANYA '/' UNTUK DEPLOYMENT ANDA SAAT INI
+  base: "/",
 
-  // publicDir menunjukkan folder untuk aset statis yang akan disalin langsung ke root output
-  // dan dapat diakses dari '/' (misal /manifest.json, /sw.js)
-  publicDir: resolve(__dirname, "src", "public"), // <--- Sesuaikan dengan struktur Anda (sekarang 'src/public')
+  publicDir: resolve(__dirname, "src", "public"),
 
   build: {
     outDir: resolve(__dirname, "dist"),
     emptyOutDir: true,
-    assetsDir: ".", // Aset seperti JS/CSS akan langsung di dalam 'dist/'
+    assetsDir: ".",
     rollupOptions: {
       input: {
-        main: resolve(__dirname, "src/index.html"), // Entry point utama HTML Anda
-        "service-worker": resolve(__dirname, "src/service-worker.js"), // <--- UBAH NAMA INPUT INI
+        main: resolve(__dirname, "src/index.html"),
+        "service-worker": resolve(__dirname, "src/service-worker.js"),
       },
       output: {
-        // entryFileNames: '[name].js', // Ini akan menghilangkan hashing nama file.
-        // Biarkan default Rollup/Vite untuk hashing jika tidak ada kebutuhan spesifik
-        // yang akan membuat caching Service Worker manual lebih sulit.
-        // Mari kita tetap pakai default hashing untuk production.
-        // Namun, teman Anda pakai entryFileNames: '[name].js' yang menghilangkan hashing.
-        // Mari kita coba ikuti dia agar sesuai dengan cara dia precaching manual.
-        entryFileNames: "[name].js", // <--- MENGHILANGKAN HASHING NAMA FILE UNTUK KEMUDAHAN CACHING MANUAL
+        entryFileNames: "[name].js",
       },
     },
   },
@@ -46,14 +33,11 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    open: "/", // Buka root path
+    open: "/",
     fs: {
       strict: false,
     },
-    proxy: {
-      // Add any API proxies if needed (tidak diperlukan untuk CORS push notification)
-    },
-    // Headers ini hanya untuk development server, tidak mempengaruhi produksi
+    proxy: {},
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
@@ -62,7 +46,6 @@ export default defineConfig({
     },
   },
   plugins: [
-    // Plugin manual untuk inject manifest dan meta tags ke index.html
     {
       name: "pwa-assets-injector",
       transformIndexHtml(html) {
@@ -80,18 +63,15 @@ export default defineConfig({
         );
       },
     },
-    // Plugin manual untuk Service Worker headers (hanya untuk development server)
     {
       name: "configure-sw-headers",
       configureServer: (server) => {
         server.middlewares.use((_req, res, next) => {
           if (_req.url === "/sw.js" || _req.url === "/service-worker.js") {
-            // Sesuaikan nama SW
             res.setHeader("Content-Type", "application/javascript");
             res.setHeader("Service-Worker-Allowed", "/");
-            res.setHeader("Cache-Control", "no-cache"); // Penting untuk development
+            res.setHeader("Cache-Control", "no-cache");
           }
-          // Memastikan MIME type yang benar untuk manifest
           if (
             _req.url.endsWith(".webmanifest") ||
             _req.url.endsWith("manifest.json")

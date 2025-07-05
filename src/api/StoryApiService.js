@@ -132,14 +132,23 @@ class StoryApiService {
         );
       }
 
-      const response = await fetch(`${API_BASE_URL}/subscriptions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(subscription),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/notifications/subscriptions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            endpoint: subscription.endpoint,
+            keys: {
+              auth: subscription.keys.auth,
+              p256dh: subscription.keys.p256dh,
+            },
+          }),
+        }
+      );
 
       const responseData = await response.json();
 
